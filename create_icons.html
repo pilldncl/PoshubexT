@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TrackHub Icon Generator</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .icon { display: inline-block; margin: 10px; text-align: center; }
+        canvas { border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>TrackHub Icon Generator</h1>
+    <p>This page will generate the required icons for the Chrome extension.</p>
+    
+    <div id="icons"></div>
+    
+    <script>
+        function createIcon(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Background
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#667eea');
+            gradient.addColorStop(1, '#764ba2');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            
+            // Package icon
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const boxSize = size * 0.4;
+            
+            // Package box
+            ctx.fillStyle = 'white';
+            ctx.fillRect(centerX - boxSize/2, centerY - boxSize/2, boxSize, boxSize);
+            
+            // Package lines
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(centerX - boxSize/2, centerY);
+            ctx.lineTo(centerX + boxSize/2, centerY);
+            ctx.moveTo(centerX, centerY - boxSize/2);
+            ctx.lineTo(centerX, centerY + boxSize/2);
+            ctx.stroke();
+            
+            return canvas;
+        }
+        
+        function generateIcons() {
+            const sizes = [16, 32, 48, 128];
+            const container = document.getElementById('icons');
+            
+            sizes.forEach(size => {
+                const div = document.createElement('div');
+                div.className = 'icon';
+                
+                const canvas = createIcon(size);
+                canvas.style.width = '64px';
+                canvas.style.height = '64px';
+                
+                const link = document.createElement('a');
+                link.download = `icon${size}.png`;
+                link.href = canvas.toDataURL();
+                link.textContent = `Download ${size}x${size}`;
+                link.style.display = 'block';
+                link.style.marginTop = '5px';
+                
+                div.appendChild(canvas);
+                div.appendChild(link);
+                container.appendChild(div);
+            });
+        }
+        
+        generateIcons();
+    </script>
+</body>
+</html>

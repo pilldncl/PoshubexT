@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Get Chrome Extension Redirect URI</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .copy-btn { background: #4285f4; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Chrome Extension Redirect URI</h1>
+    <p>This will show you the redirect URI that your Chrome extension needs to add to Google OAuth.</p>
+    
+    <div id="result" class="result">
+        <p><strong>Redirect URI:</strong></p>
+        <p id="redirectUri">Loading...</p>
+        <button class="copy-btn" onclick="copyToClipboard()">Copy to Clipboard</button>
+    </div>
+    
+    <div style="margin-top: 20px; padding: 15px; background: #e8f4fd; border-radius: 5px;">
+        <h3>Next Steps:</h3>
+        <ol>
+            <li>Copy the redirect URI above</li>
+            <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+            <li>Navigate to your OAuth 2.0 Client ID</li>
+            <li>Add the redirect URI to "Authorized redirect URIs"</li>
+            <li>Save the changes</li>
+        </ol>
+    </div>
+
+    <script>
+        // Get the redirect URI that Chrome extensions use
+        if (typeof chrome !== 'undefined' && chrome.identity) {
+            const redirectUri = chrome.identity.getRedirectURL();
+            document.getElementById('redirectUri').textContent = redirectUri;
+        } else {
+            document.getElementById('redirectUri').textContent = 'Chrome identity API not available. Load this in your extension context.';
+        }
+        
+        function copyToClipboard() {
+            const redirectUri = document.getElementById('redirectUri').textContent;
+            navigator.clipboard.writeText(redirectUri).then(() => {
+                alert('Redirect URI copied to clipboard!');
+            });
+        }
+    </script>
+</body>
+</html>
