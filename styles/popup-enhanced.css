@@ -1,0 +1,543 @@
+/* Enhanced TrackHub Popup Styles with Editable States */
+
+/* Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f8fafc;
+    color: #1f2937;
+    line-height: 1.5;
+}
+
+.container {
+    width: 400px;
+    min-height: 500px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+/* Section Management */
+.section {
+    padding: 24px;
+    min-height: 500px;
+}
+
+.section.hidden {
+    display: none;
+}
+
+/* Header Styles */
+.header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px 24px;
+    margin: -24px -24px 24px -24px;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo {
+    font-size: 24px;
+}
+
+.header h1 {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.user-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.user-email {
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.btn-logout {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-logout:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Authentication Styles */
+.auth-options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+}
+
+.btn-large {
+    padding: 16px 20px;
+    font-size: 16px;
+}
+
+.btn-google {
+    background: #4285f4;
+    color: white;
+    border: 1px solid #4285f4;
+}
+
+.btn-google:hover {
+    background: #3367d6;
+    border-color: #3367d6;
+}
+
+.btn-primary {
+    background: #3b82f6;
+    color: white;
+    border: 1px solid #3b82f6;
+}
+
+.btn-primary:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+
+.btn-secondary {
+    background: #6b7280;
+    color: white;
+    border: 1px solid #6b7280;
+}
+
+.btn-secondary:hover {
+    background: #4b5563;
+    border-color: #4b5563;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #6b7280;
+    border: 1px solid #d1d5db;
+}
+
+.btn-outline:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+}
+
+.btn-small {
+    padding: 8px 12px;
+    font-size: 12px;
+}
+
+.auth-divider {
+    text-align: center;
+    position: relative;
+    margin: 8px 0;
+}
+
+.auth-divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #e5e7eb;
+}
+
+.auth-divider span {
+    background: white;
+    padding: 0 16px;
+    color: #6b7280;
+    font-size: 14px;
+}
+
+/* Form Styles */
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.input-group label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.input-group input,
+.input-group select {
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.input-group input:focus,
+.input-group select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Tracking Form Styles */
+.tracking-form {
+    background: #f9fafb;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.section-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.section-subtitle {
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.tracking-count {
+    font-size: 14px;
+    color: #6b7280;
+    background: #f3f4f6;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+/* Tracking Items Styles */
+.tracking-items {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tracking-item {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    transition: all 0.2s;
+}
+
+.tracking-item:hover {
+    border-color: #d1d5db;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Locked State Styles */
+.tracking-item-locked {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tracking-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.tracking-number {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 4px;
+    word-break: break-all;
+}
+
+.tracking-brand {
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+
+.tracking-description {
+    font-size: 14px;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+.tracking-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: 12px;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    color: #6b7280;
+    padding: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon:hover {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.btn-icon.delete-btn:hover {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+/* Editable State Styles */
+.tracking-item-editable {
+    display: none;
+}
+
+.tracking-item-editable:not(.hidden) {
+    display: block;
+}
+
+.edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.edit-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6b7280;
+}
+
+.empty-state-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.empty-state h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #374151;
+}
+
+.empty-state p {
+    font-size: 14px;
+    color: #6b7280;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* Status Messages */
+.status-message {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.status-success {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.status-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+}
+
+.status-info {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+}
+
+/* Settings Styles */
+.settings-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.settings-content h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 8px;
+}
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.setting-item label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #374151;
+}
+
+.setting-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #3b82f6;
+}
+
+/* Utility Classes */
+.hidden {
+    display: none !important;
+}
+
+/* Responsive Design */
+@media (max-width: 400px) {
+    .container {
+        width: 100%;
+        border-radius: 0;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .tracking-actions {
+        flex-wrap: wrap;
+    }
+}
+
+/* Animation for state transitions */
+.tracking-item-locked,
+.tracking-item-editable {
+    transition: opacity 0.2s ease-in-out;
+}
+
+.tracking-item-editable.hidden {
+    opacity: 0;
+}
+
+.tracking-item-locked.hidden {
+    opacity: 0;
+}
+
+/* Focus styles for accessibility */
+.btn:focus,
+.btn-icon:focus,
+input:focus,
+select:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Loading states */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Carrier icons in select options */
+select option {
+    padding: 8px;
+}
+
+/* Enhanced tracking item hover effects */
+.tracking-item:hover .tracking-actions {
+    opacity: 1;
+}
+
+.tracking-actions {
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+/* Edit mode visual feedback */
+.tracking-item.editing {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Form validation styles */
+.input-group input.error,
+.input-group select.error {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.input-group .error-message {
+    color: #dc2626;
+    font-size: 12px;
+    margin-top: 4px;
+}

@@ -1,13 +1,13 @@
 # TrackHub OAuth Credentials Setup Script
 # This script helps you securely set up OAuth credentials
 
-Write-Host "🚀 TrackHub OAuth Setup" -ForegroundColor Green
+Write-Host "TrackHub OAuth Setup" -ForegroundColor Green
 Write-Host "=========================" -ForegroundColor Green
 
 # Check if credentials file already exists
 $credentialsFile = "config/oauth-credentials.js"
 if (Test-Path $credentialsFile) {
-    Write-Host "⚠️  Credentials file already exists!" -ForegroundColor Yellow
+    Write-Host "Credentials file already exists!" -ForegroundColor Yellow
     $overwrite = Read-Host "Do you want to overwrite it? (y/N)"
     if ($overwrite -ne "y" -and $overwrite -ne "Y") {
         Write-Host "Setup cancelled." -ForegroundColor Red
@@ -15,7 +15,7 @@ if (Test-Path $credentialsFile) {
     }
 }
 
-Write-Host "`n📋 Please provide your Google OAuth credentials:" -ForegroundColor Cyan
+Write-Host "`nPlease provide your Google OAuth credentials:" -ForegroundColor Cyan
 
 # Get Client ID
 do {
@@ -23,7 +23,7 @@ do {
     if ($clientId -match '^\d+-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$') {
         break
     } else {
-        Write-Host "❌ Invalid Client ID format. Please try again." -ForegroundColor Red
+        Write-Host "Invalid Client ID format. Please try again." -ForegroundColor Red
     }
 } while ($true)
 
@@ -33,14 +33,14 @@ do {
     if ($clientSecret -match '^GOCSPX-[a-zA-Z0-9_-]+$') {
         break
     } else {
-        Write-Host "❌ Invalid Client Secret format. Please try again." -ForegroundColor Red
+        Write-Host "Invalid Client Secret format. Please try again." -ForegroundColor Red
     }
 } while ($true)
 
 # Create credentials file
 $credentialsContent = @"
 // OAuth Configuration for TrackHub Chrome Extension
-// ⚠️  SECURITY: This file contains sensitive credentials and is in .gitignore
+// SECURITY: This file contains sensitive credentials and is in .gitignore
 
 export const OAUTH_CONFIG = {
   google: {
@@ -233,14 +233,14 @@ if (!(Test-Path "config")) {
 # Write credentials file
 $credentialsContent | Out-File -FilePath $credentialsFile -Encoding UTF8
 
-Write-Host "`n✅ OAuth credentials configured successfully!" -ForegroundColor Green
-Write-Host "📁 Credentials saved to: $credentialsFile" -ForegroundColor Cyan
-Write-Host "🔒 This file is protected by .gitignore and will NOT be committed to Git" -ForegroundColor Yellow
+Write-Host "`nOAuth credentials configured successfully!" -ForegroundColor Green
+Write-Host "Credentials saved to: $credentialsFile" -ForegroundColor Cyan
+Write-Host "This file is protected by .gitignore and will NOT be committed to Git" -ForegroundColor Yellow
 
-Write-Host "`n📋 Next steps:" -ForegroundColor Cyan
+Write-Host "`nNext steps:" -ForegroundColor Cyan
 Write-Host "1. Load your extension in Chrome (chrome://extensions/)" -ForegroundColor White
 Write-Host "2. Get your Extension ID using get_extension_id.html" -ForegroundColor White
 Write-Host "3. Configure Google OAuth with your Extension ID" -ForegroundColor White
 Write-Host "4. Test the OAuth flow in your extension" -ForegroundColor White
 
-Write-Host "`n🚀 You're ready to go!" -ForegroundColor Green
+Write-Host "`nYou're ready to go!" -ForegroundColor Green

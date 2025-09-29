@@ -318,47 +318,6 @@ class TrackingStateManager {
       this.editingItems.delete(itemId);
     }
   }
-
-  normalizeTrackingNumber(trackingNumber) {
-    if (!trackingNumber) return '';
-    
-    // Remove all whitespace, line breaks, and special characters except alphanumeric
-    let normalized = trackingNumber
-      .replace(/\s+/g, '')           // Remove all spaces
-      .replace(/\n/g, '')             // Remove line breaks
-      .replace(/\r/g, '')             // Remove carriage returns
-      .replace(/\t/g, '')             // Remove tabs
-      .replace(/[^\w]/g, '')          // Remove special characters except alphanumeric
-      .toUpperCase();                 // Convert to uppercase
-    
-    // Handle specific carrier formatting
-    if (normalized.startsWith('1Z')) {
-      // UPS tracking numbers should be uppercase
-      return normalized;
-    }
-    
-    // For USPS tracking numbers, add spaces every 4 characters if it's 20 digits
-    if (normalized.length === 20 && /^\d{20}$/.test(normalized)) {
-      return normalized.replace(/(.{4})/g, '$1 ').trim();
-    }
-    
-    // For other tracking numbers, return as-is but cleaned
-    return normalized;
-  }
-
-  validateAndNormalizeInput(trackingNumber) {
-    const normalized = this.normalizeTrackingNumber(trackingNumber);
-    
-    // Check if normalization changed the input
-    const wasChanged = normalized !== trackingNumber.trim();
-    
-    return {
-      normalized,
-      wasChanged,
-      originalLength: trackingNumber.length,
-      normalizedLength: normalized.length
-    };
-  }
 }
 
 // Enhanced TrackHub Popup with Editable States
@@ -425,14 +384,6 @@ class TrackHubPopup {
             this.handleTrackingNumberChange(e.target.value);
         });
 
-        // Handle paste events for tracking number normalization
-        document.getElementById('trackingNumber').addEventListener('paste', (e) => {
-            // Allow the paste to complete, then normalize
-            setTimeout(() => {
-                this.handleTrackingNumberChange(e.target.value);
-            }, 10);
-        });
-
         // External webapp access
         document.getElementById('openWebappBtn').addEventListener('click', () => {
             this.openExternalWebapp();
@@ -468,17 +419,8 @@ class TrackHubPopup {
             return;
         }
 
-        // Normalize the tracking number
-        const normalizedNumber = this.stateManager.normalizeTrackingNumber(trackingNumber);
-        
-        // Update the input field with normalized value if it changed
-        const inputField = document.getElementById('trackingNumber');
-        if (normalizedNumber !== trackingNumber) {
-            inputField.value = normalizedNumber;
-        }
-
         // Auto-detect carrier
-        const suggestion = this.stateManager.suggestCarrier(normalizedNumber);
+        const suggestion = this.stateManager.suggestCarrier(trackingNumber);
         
         if (suggestion.confidence === 'high' || suggestion.confidence === 'medium') {
             // Auto-select the detected carrier
@@ -637,18 +579,9 @@ class TrackHubPopup {
         }
 
         try {
-            // Normalize the tracking number
-            const normalizedData = this.stateManager.validateAndNormalizeInput(trackingNumber);
-            const normalizedTrackingNumber = normalizedData.normalized;
-
-            // Show user if normalization occurred
-            if (normalizedData.wasChanged) {
-                this.showMessage('Tracking number cleaned and formatted', 'info');
-            }
-
             // Validate the tracking item data
             const validation = this.stateManager.validateTrackingItem({
-                trackingNumber: normalizedTrackingNumber,
+                trackingNumber,
                 brand,
                 description
             });
@@ -660,7 +593,7 @@ class TrackHubPopup {
 
             const trackingItem = {
                 id: Date.now().toString(),
-                trackingNumber: normalizedTrackingNumber,
+                trackingNumber: trackingNumber.trim(),
                 brand: brand,
                 description: description.trim(),
                 dateAdded: new Date().toISOString(),
@@ -737,21 +670,18 @@ class TrackHubPopup {
                                 <polyline points="3.27,6.96 12,12.01 20.73,6.96"/>
                                 <line x1="12" y1="22.08" x2="12" y2="12"/>
                             </svg>
-                            <span>Track</span>
                         </button>
                         <button class="btn-icon copy-btn" title="Copy">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                             </svg>
-                            <span>Copy</span>
                         </button>
                         <button class="btn-icon edit-btn" title="Edit">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                             </svg>
-                            <span>Edit</span>
                         </button>
                         <button class="btn-icon delete-btn" title="Delete">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -760,7 +690,6 @@ class TrackHubPopup {
                                 <line x1="10" y1="11" x2="10" y2="17"/>
                                 <line x1="14" y1="11" x2="14" y2="17"/>
                             </svg>
-                            <span>Delete</span>
                         </button>
                     </div>
                 </div>
@@ -911,18 +840,9 @@ class TrackHubPopup {
             const brand = editableState.querySelector('.edit-brand').value;
             const description = editableState.querySelector('.edit-description').value;
 
-            // Normalize the tracking number
-            const normalizedData = this.stateManager.validateAndNormalizeInput(trackingNumber);
-            const normalizedTrackingNumber = normalizedData.normalized;
-
-            // Show user if normalization occurred
-            if (normalizedData.wasChanged) {
-                this.showMessage('Tracking number cleaned and formatted', 'info');
-            }
-
             // Validate the data
             const validation = this.stateManager.validateTrackingItem({
-                trackingNumber: normalizedTrackingNumber,
+                trackingNumber,
                 brand,
                 description
             });
@@ -935,7 +855,7 @@ class TrackHubPopup {
             // Update the item
             const item = this.trackingItems.find(i => i.id === itemId);
             if (item) {
-                item.trackingNumber = normalizedTrackingNumber;
+                item.trackingNumber = trackingNumber.trim();
                 item.brand = brand;
                 item.description = description.trim();
                 item.updatedAt = new Date().toISOString();
