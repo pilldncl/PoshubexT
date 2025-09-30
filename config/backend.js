@@ -2,7 +2,7 @@
 
 export const BACKEND_CONFIG = {
   // API Base URL - Update this with your actual backend URL
-  baseUrl: 'https://your-backend-api.com',
+  baseUrl: 'https://your-backend-api.com', // Replace with your actual backend URL
   
   // API Endpoints
   endpoints: {
@@ -12,6 +12,7 @@ export const BACKEND_CONFIG = {
     updateTracking: '/api/tracking/update',
     getTrackings: '/api/tracking/list',
     syncTrackings: '/api/tracking/sync',
+    getUserTrackings: '/api/tracking/user',
     
     // User endpoints
     getUser: '/api/user/profile',

@@ -384,6 +384,9 @@ class TrackHubPopup {
             // Check authentication status
             await this.checkAuthStatus();
             
+            // Process any pending backend requests
+            await this.processPendingBackendRequests();
+            
         } catch (error) {
             console.error('Error initializing popup:', error);
             this.showMessage('Failed to initialize. Please try again.', 'error');
@@ -443,6 +446,22 @@ class TrackHubPopup {
             this.syncData();
         });
 
+        // Test token formats button (for debugging)
+        const testTokenBtn = document.getElementById('testTokenBtn');
+        if (testTokenBtn) {
+            testTokenBtn.addEventListener('click', () => {
+                this.testTokenFormats();
+            });
+        }
+
+        // Debug token status button (for debugging)
+        const debugTokenBtn = document.getElementById('debugTokenBtn');
+        if (debugTokenBtn) {
+            debugTokenBtn.addEventListener('click', () => {
+                this.debugTokenStatus();
+            });
+        }
+
         // Settings navigation
         document.getElementById('backToDashboardBtn').addEventListener('click', () => {
             this.showSection('dashboardSection');
@@ -458,6 +477,19 @@ class TrackHubPopup {
                 this.loadTrackingItems();
                 this.showMessage('Tracking added via context menu!', 'success');
             }
+            
+            if (request.action === 'syncTrackingToBackend') {
+                console.log('🟡 Popup: Received sync request from background:', request.data);
+                // Sync the tracking item to backend
+                this.syncTrackingToBackend(request.data);
+            }
+            
+            if (request.action === 'submitBackendRequest') {
+                console.log('🟡 Popup: Received backend request from background:', request.data);
+                // Submit the backend request prepared by background script
+                this.submitBackendRequest(request.data);
+            }
+            
             sendResponse({ received: true });
         });
     }
@@ -496,6 +528,19 @@ class TrackHubPopup {
             const isOAuthAuthenticated = await this.oauthManager.isAuthenticated();
             if (isOAuthAuthenticated) {
                 this.currentUser = await this.oauthManager.getCurrentUser();
+                this.updateUserInfo(this.currentUser);
+                this.showSection('dashboardSection');
+                await this.loadTrackingItems();
+                return;
+            }
+
+            // Check backend authentication
+            const { AuthService } = await import('./config/auth-service.js');
+            const authService = new AuthService();
+            
+            const isBackendAuthenticated = await authService.isAuthenticated();
+            if (isBackendAuthenticated) {
+                this.currentUser = await authService.getCurrentUser();
                 this.updateUserInfo(this.currentUser);
                 this.showSection('dashboardSection');
                 await this.loadTrackingItems();
@@ -615,6 +660,14 @@ class TrackHubPopup {
                 await this.oauthManager.logout();
             }
             
+            // Logout from backend if authenticated
+            const { AuthService } = await import('./config/auth-service.js');
+            const authService = new AuthService();
+            
+            if (await authService.isAuthenticated()) {
+                await authService.logout();
+            }
+            
             // Clear local storage
             await chrome.storage.local.remove(['user', 'isLoggedIn']);
             this.currentUser = null;
@@ -667,9 +720,36 @@ class TrackHubPopup {
                 status: 'pending'
             };
 
-            // Add to local storage
+            // Add to local storage first for immediate UI update
             this.trackingItems.push(trackingItem);
             await this.saveTrackingItems();
+
+            // Try to save to backend
+            try {
+                console.log('🟡 Attempting to save tracking to backend...');
+                const { TrackingService } = await import('./config/tracking-service.js');
+                const trackingService = new TrackingService();
+                
+                const backendResult = await trackingService.addTrackingToBackend(trackingItem);
+                
+                // Update local item with backend ID
+                const updatedItem = {
+                    ...trackingItem,
+                    backendId: backendResult.backendId
+                };
+                
+                // Update the item in local storage
+                const itemIndex = this.trackingItems.findIndex(item => item.id === trackingItem.id);
+                if (itemIndex !== -1) {
+                    this.trackingItems[itemIndex] = updatedItem;
+                    await this.saveTrackingItems();
+                }
+                
+                console.log('🟢 Tracking saved to backend successfully with ID:', backendResult.backendId);
+            } catch (backendError) {
+                console.error('🔴 Failed to save to backend, keeping local only:', backendError);
+                // Don't show error to user, item is saved locally
+            }
 
             // Send to background script for external webapp sync
             chrome.runtime.sendMessage({
@@ -691,11 +771,24 @@ class TrackHubPopup {
 
     async loadTrackingItems() {
         try {
-            const result = await chrome.storage.local.get(['trackingItems']);
-            this.trackingItems = result.trackingItems || [];
+            // Use tracking service to load items (handles backend sync)
+            const { TrackingService } = await import('./config/tracking-service.js');
+            const trackingService = new TrackingService();
+            
+            this.trackingItems = await trackingService.loadTrackingItems();
             this.displayTrackingItems();
         } catch (error) {
             console.error('Error loading tracking items:', error);
+            // Fallback to local storage only
+            try {
+                const result = await chrome.storage.local.get(['trackingItems']);
+                this.trackingItems = result.trackingItems || [];
+                this.displayTrackingItems();
+            } catch (fallbackError) {
+                console.error('Fallback loading also failed:', fallbackError);
+                this.trackingItems = [];
+                this.displayTrackingItems();
+            }
         }
     }
 
@@ -984,9 +1077,30 @@ class TrackHubPopup {
 
     async deleteTracking(itemId) {
         try {
-            // Remove from local storage
+            // Find the item to delete
+            const itemToDelete = this.trackingItems.find(item => item.id === itemId);
+            if (!itemToDelete) {
+                this.showMessage('Tracking item not found', 'error');
+                return;
+            }
+
+            // Remove from local storage first
             this.trackingItems = this.trackingItems.filter(item => item.id !== itemId);
             await this.saveTrackingItems();
+
+            // Try to delete from backend if it has a backend ID
+            if (itemToDelete.backendId) {
+                try {
+                    const { TrackingService } = await import('./config/tracking-service.js');
+                    const trackingService = new TrackingService();
+                    
+                    await trackingService.deleteTrackingFromBackend(itemToDelete);
+                    console.log('Tracking deleted from backend successfully');
+                } catch (backendError) {
+                    console.error('Failed to delete from backend:', backendError);
+                    // Don't show error to user, item is deleted locally
+                }
+            }
 
             // Refresh display
             await this.loadTrackingItems();
@@ -1005,9 +1119,198 @@ class TrackHubPopup {
         }
     }
 
+    async submitBackendRequest(requestData) {
+        try {
+            console.log('🟡 Popup: Submitting backend request prepared by background:', requestData);
+            
+            const { trackingItem, requestData: backendRequest } = requestData;
+            
+            // Submit the request prepared by background script
+            console.log('🔵 Popup: Submitting request with headers:', backendRequest.headers);
+            console.log('🔵 Popup: Authorization header value:', backendRequest.headers.Authorization);
+            console.log('🔵 Popup: Request body:', backendRequest.body);
+            
+            const response = await fetch(backendRequest.url, {
+                method: backendRequest.method,
+                headers: backendRequest.headers,
+                body: JSON.stringify(backendRequest.body)
+            });
+
+            console.log('🔵 Response status:', response.status);
+            console.log('🔵 Response headers:', Object.fromEntries(response.headers.entries()));
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.error('🔴 Backend request failed:', response.status, errorData);
+                
+                // Log detailed validation errors
+                if (response.status === 400 && errorData.details) {
+                    console.error('🔴 Validation details:', errorData.details);
+                }
+                
+                throw new Error(`Backend request failed: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            console.log('🟢 Backend request successful:', data);
+            
+            // Update local item with backend ID
+            const updatedItem = {
+                ...trackingItem,
+                backendId: data.id || data.trackingId
+            };
+            
+            // Update the item in local storage
+            const itemIndex = this.trackingItems.findIndex(item => item.id === trackingItem.id);
+            if (itemIndex !== -1) {
+                this.trackingItems[itemIndex] = updatedItem;
+                await this.saveTrackingItems();
+            }
+            
+            console.log('🟢 Popup: Tracking synced to backend successfully with ID:', data.id || data.trackingId);
+        } catch (error) {
+            console.error('🔴 Popup: Failed to submit backend request:', error);
+            // Don't show error to user, item is saved locally
+        }
+    }
+
+    async syncTrackingToBackend(trackingItem) {
+        try {
+            console.log('🟡 Popup: Syncing tracking to backend:', trackingItem);
+            
+            const { TrackingService } = await import('./config/tracking-service.js');
+            const trackingService = new TrackingService();
+            
+            const backendResult = await trackingService.addTrackingToBackend(trackingItem);
+            
+            // Update local item with backend ID
+            const updatedItem = {
+                ...trackingItem,
+                backendId: backendResult.backendId
+            };
+            
+            // Update the item in local storage
+            const itemIndex = this.trackingItems.findIndex(item => item.id === trackingItem.id);
+            if (itemIndex !== -1) {
+                this.trackingItems[itemIndex] = updatedItem;
+                await this.saveTrackingItems();
+            }
+            
+            console.log('🟢 Popup: Tracking synced to backend successfully with ID:', backendResult.backendId);
+        } catch (error) {
+            console.error('🔴 Popup: Failed to sync tracking to backend:', error);
+            // Don't show error to user, item is saved locally
+        }
+    }
+
+    async processPendingBackendRequests() {
+        try {
+            const result = await chrome.storage.local.get(['pendingBackendRequests']);
+            const pendingRequests = result.pendingBackendRequests || [];
+            
+            if (pendingRequests.length > 0) {
+                console.log(`🟡 Popup: Processing ${pendingRequests.length} pending backend requests`);
+                
+                for (const request of pendingRequests) {
+                    try {
+                        await this.submitBackendRequest(request);
+                        console.log('🟢 Popup: Processed pending backend request');
+                    } catch (error) {
+                        console.error('🔴 Popup: Failed to process pending backend request:', error);
+                    }
+                }
+                
+                // Clear processed requests
+                await chrome.storage.local.remove(['pendingBackendRequests']);
+                console.log('🟢 Popup: Cleared processed pending requests');
+            }
+        } catch (error) {
+            console.error('Error processing pending backend requests:', error);
+        }
+    }
+
+    async debugTokenStatus() {
+        try {
+            console.log('🔍 Debugging token status...');
+            
+            // Check all auth-related storage
+            const authData = await chrome.storage.local.get([
+                'trackhub_access_token',
+                'trackhub_refresh_token', 
+                'trackhub_user_info',
+                'trackhub_token_expiry',
+                'trackhub_is_logged_in'
+            ]);
+            
+            console.log('🔍 Auth storage data:', authData);
+            
+            // Check if user is logged in
+            const isLoggedIn = authData.trackhub_is_logged_in;
+            const accessToken = authData.trackhub_access_token;
+            const userInfo = authData.trackhub_user_info;
+            const tokenExpiry = authData.trackhub_token_expiry;
+            
+            console.log('🔍 Login status:', isLoggedIn);
+            console.log('🔍 Access token:', accessToken ? 'Present' : 'Missing');
+            console.log('🔍 User info:', userInfo);
+            console.log('🔍 Token expiry:', tokenExpiry ? new Date(tokenExpiry).toISOString() : 'None');
+            
+            if (accessToken) {
+                console.log('🔍 Token preview:', accessToken.substring(0, 20) + '...');
+                console.log('🔍 Token length:', accessToken.length);
+                console.log('🔍 Token starts with Bearer:', accessToken.startsWith('Bearer '));
+            }
+            
+            // Test token retrieval from tracking service
+            const { TrackingService } = await import('./config/tracking-service.js');
+            const trackingService = new TrackingService();
+            const retrievedToken = await trackingService.getAuthToken();
+            console.log('🔍 Retrieved token:', retrievedToken ? 'Present' : 'Missing');
+            
+            if (retrievedToken) {
+                console.log('🔍 Retrieved token preview:', retrievedToken.substring(0, 20) + '...');
+            }
+            
+            this.showMessage('Token debug complete - check console', 'info');
+            
+        } catch (error) {
+            console.error('Error debugging token status:', error);
+            this.showMessage('Token debug failed', 'error');
+        }
+    }
+
+    async testTokenFormats() {
+        try {
+            this.showMessage('Testing token formats...', 'info');
+            
+            const { TrackingService } = await import('./config/tracking-service.js');
+            const trackingService = new TrackingService();
+            
+            const workingFormat = await trackingService.testTokenFormats();
+            
+            if (workingFormat) {
+                this.showMessage(`Token format test successful!`, 'success');
+            } else {
+                this.showMessage('No working token format found', 'error');
+            }
+        } catch (error) {
+            console.error('Error testing token formats:', error);
+            this.showMessage('Token format test failed', 'error');
+        }
+    }
+
     async syncData() {
         try {
             this.showMessage('Syncing data...', 'info');
+            
+            // Use tracking service to sync with backend
+            const { TrackingService } = await import('./config/tracking-service.js');
+            const trackingService = new TrackingService();
+            
+            const syncResult = await trackingService.syncWithBackend();
+            
+            // Refresh the tracking items after sync
+            await this.loadTrackingItems();
             
             // Send all tracking data to external webapp
             chrome.runtime.sendMessage({
@@ -1015,7 +1318,7 @@ class TrackHubPopup {
                 data: this.trackingItems
             });
             
-            this.showMessage('Data synced successfully!', 'success');
+            this.showMessage(`Data synced successfully! (${syncResult.mergedCount} items)`, 'success');
         } catch (error) {
             console.error('Error syncing data:', error);
             this.showMessage('Sync failed. Please try again.', 'error');
@@ -1070,35 +1373,57 @@ class TrackHubPopup {
         }, 3000);
     }
 
-    // Simulated authentication methods - replace with real API calls
+    // Real backend authentication methods
     async authenticateUser(email, password) {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Simple validation for demo
-        if (email.includes('@') && password.length >= 6) {
-            return {
-                id: Date.now().toString(),
-                email: email,
-                name: email.split('@')[0]
-            };
+        try {
+            // Import the auth service
+            const { AuthService } = await import('./config/auth-service.js');
+            const authService = new AuthService();
+            
+            // Validate inputs
+            if (!authService.validateEmail(email)) {
+                throw new Error('Please enter a valid email address');
+            }
+            
+            const passwordValidation = authService.validatePassword(password);
+            if (!passwordValidation.valid) {
+                throw new Error(passwordValidation.message);
+            }
+            
+            // Call backend API
+            const result = await authService.login(email, password);
+            return result.user;
+            
+        } catch (error) {
+            console.error('Authentication error:', error);
+            throw error;
         }
-        return null;
     }
 
     async registerUser(email, password) {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Simple validation for demo
-        if (email.includes('@') && password.length >= 6) {
-            return {
-                id: Date.now().toString(),
-                email: email,
-                name: email.split('@')[0]
-            };
+        try {
+            // Import the auth service
+            const { AuthService } = await import('./config/auth-service.js');
+            const authService = new AuthService();
+            
+            // Validate inputs
+            if (!authService.validateEmail(email)) {
+                throw new Error('Please enter a valid email address');
+            }
+            
+            const passwordValidation = authService.validatePassword(password);
+            if (!passwordValidation.valid) {
+                throw new Error(passwordValidation.message);
+            }
+            
+            // Call backend API
+            const result = await authService.register(email, password);
+            return result.user;
+            
+        } catch (error) {
+            console.error('Registration error:', error);
+            throw error;
         }
-        return null;
     }
 }
 

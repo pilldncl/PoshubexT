@@ -98,13 +98,72 @@ class TrackHubBackground {
                 trackingData.brand = this.detectBrand(trackingData.trackingNumber);
             }
 
-            // Store in local storage
+            // Store in local storage first
             const result = await chrome.storage.local.get(['trackingItems']);
             const trackingItems = result.trackingItems || [];
             trackingItems.push(trackingData);
             await chrome.storage.local.set({ trackingItems });
 
             console.log('Tracking item added to storage:', trackingData);
+            
+            // Prepare backend request data and send to popup
+            try {
+                const authToken = await this.getAuthToken();
+                console.log('🔑 Background: Auth token retrieved:', authToken ? 'Present' : 'Missing');
+                
+                // Try different token formats based on what backend expects
+                let authHeader = '';
+                if (authToken) {
+                    // Check if token already has Bearer prefix
+                    if (authToken.startsWith('Bearer ')) {
+                        authHeader = authToken;
+                    } else {
+                        // Try Bearer format first (most common)
+                        authHeader = `Bearer ${authToken}`;
+                    }
+                }
+                
+                const backendRequestData = {
+                    method: 'POST',
+                    url: 'http://localhost:3000/api/tracking/add',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': authHeader,
+                        'X-Extension-Version': '1.0.0'
+                    },
+                    body: {
+                        trackingNumber: trackingData.trackingNumber,
+                        brand: trackingData.brand,
+                        description: trackingData.description || '',
+                        dateAdded: trackingData.dateAdded,
+                        status: trackingData.status || 'pending'
+                    }
+                };
+                
+                console.log('🔵 Background: Request headers prepared:', backendRequestData.headers);
+                console.log('🔵 Background: Authorization header value:', backendRequestData.headers.Authorization);
+
+                // Try to send message to popup
+                chrome.runtime.sendMessage({
+                    action: 'submitBackendRequest',
+                    data: {
+                        trackingItem: trackingData,
+                        requestData: backendRequestData
+                    }
+                }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        console.log('🔴 Background: Popup not open, message failed:', chrome.runtime.lastError.message);
+                        // Store the request for when popup opens
+                        this.storePendingBackendRequest(trackingData, backendRequestData);
+                    } else {
+                        console.log('🟢 Background: Message sent to popup successfully');
+                    }
+                });
+                
+                console.log('🟡 Background: Prepared backend request data for popup');
+            } catch (error) {
+                console.log('🔴 Background: Error preparing backend request:', error);
+            }
             
             // Notify popup to refresh if it's open
             try {
@@ -133,6 +192,32 @@ class TrackHubBackground {
         } catch (error) {
             console.error('Error getting tracking items:', error);
             return [];
+        }
+    }
+
+    async getAuthToken() {
+        try {
+            const result = await chrome.storage.local.get(['trackhub_access_token']);
+            return result.trackhub_access_token || null;
+        } catch (error) {
+            console.error('Error getting auth token:', error);
+            return null;
+        }
+    }
+
+    async storePendingBackendRequest(trackingData, requestData) {
+        try {
+            const result = await chrome.storage.local.get(['pendingBackendRequests']);
+            const pendingRequests = result.pendingBackendRequests || [];
+            pendingRequests.push({
+                trackingItem: trackingData,
+                requestData: requestData,
+                timestamp: Date.now()
+            });
+            await chrome.storage.local.set({ pendingBackendRequests: pendingRequests });
+            console.log('🟡 Background: Stored pending backend request for later');
+        } catch (error) {
+            console.error('Error storing pending backend request:', error);
         }
     }
 

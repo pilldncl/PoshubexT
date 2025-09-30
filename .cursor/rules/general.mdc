@@ -1,0 +1,20 @@
+---
+alwaysApply: true
+---
+this app is going to be chrom app, 
+
+architecture would be 
+- CHROM APP 
+- BACKEND  ( THIS BACK END IS EXTERNAL in another project) 
+
+MAIN COMMUNICATE WOULD BE JUST API . 
+REGARDING LOGIN, 
+It should had start with basic login , Custom API for google signup\sign in 
+
+DO NOT IMPLEMENT CHROM IDENTIY API yet since the app not functioning correctly. 
+
+Keep the cOde clean, 
+No need for length documentations or .md file
+Keep explanation pact and brief enough to manuever throughh the features . 
+Alert if the feature is too much or mistake. 
+Avoid spending too much token as necessary
