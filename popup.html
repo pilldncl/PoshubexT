@@ -140,6 +140,37 @@
                     </svg>
                     Sync
                 </button>
+                <button id="apiDebugBtn" class="btn btn-outline" style="background-color: #6366f1; color: white; border-color: #6366f1;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+                    </svg>
+                    Debug API
+                </button>
+            </div>
+
+            <!-- API Debug Modal -->
+            <div id="apiDebugModal" class="modal" style="display: none;">
+                <div class="modal-content" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
+                    <div class="modal-header">
+                        <h3>API Debug Tool</h3>
+                        <button id="closeDebugModal" class="btn-icon" style="background: none; border: none; cursor: pointer;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="debugResults" style="font-family: monospace; font-size: 12px; white-space: pre-wrap; background: #f5f5f5; padding: 16px; border-radius: 8px; max-height: 400px; overflow-y: auto;">
+                            Click "Run Tests" to start debugging...
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;">
+                        <button id="runDebugTests" class="btn btn-primary">Run Tests</button>
+                        <button id="copyDebugResults" class="btn btn-outline">Copy Results</button>
+                        <button id="closeDebugModalBtn" class="btn btn-outline">Close</button>
+                    </div>
+                </div>
             </div>
         </div>
 

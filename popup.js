@@ -446,6 +446,28 @@ class TrackHubPopup {
             this.syncData();
         });
 
+        // API Debug button
+        document.getElementById('apiDebugBtn').addEventListener('click', () => {
+            this.openDebugModal();
+        });
+
+        // Debug modal controls
+        document.getElementById('closeDebugModal').addEventListener('click', () => {
+            this.closeDebugModal();
+        });
+
+        document.getElementById('closeDebugModalBtn').addEventListener('click', () => {
+            this.closeDebugModal();
+        });
+
+        document.getElementById('runDebugTests').addEventListener('click', () => {
+            this.runDebugTests();
+        });
+
+        document.getElementById('copyDebugResults').addEventListener('click', () => {
+            this.copyDebugResults();
+        });
+
         // Test token formats button (for debugging)
         const testTokenBtn = document.getElementById('testTokenBtn');
         if (testTokenBtn) {
@@ -1333,6 +1355,54 @@ class TrackHubPopup {
         } catch (error) {
             console.error('Error opening webapp:', error);
             this.showMessage('Failed to open webapp', 'error');
+        }
+    }
+
+    // Debug Modal Methods
+    openDebugModal() {
+        const modal = document.getElementById('apiDebugModal');
+        modal.style.display = 'block';
+    }
+
+    closeDebugModal() {
+        const modal = document.getElementById('apiDebugModal');
+        modal.style.display = 'none';
+    }
+
+    async runDebugTests() {
+        try {
+            const resultsDiv = document.getElementById('debugResults');
+            resultsDiv.textContent = 'Running tests...\n\nPlease wait...';
+
+            // Import and run API debugger
+            const { APIDebugger } = await import('./config/api-debugger.js');
+            const apiDebugger = new APIDebugger();
+            
+            const results = await apiDebugger.runAllTests();
+            const formattedResults = apiDebugger.formatResults(results);
+            
+            resultsDiv.textContent = formattedResults;
+            
+            // Store results for copying
+            this.lastDebugResults = formattedResults;
+
+        } catch (error) {
+            console.error('Debug test error:', error);
+            document.getElementById('debugResults').textContent = `Error running tests:\n${error.message}\n\nStack: ${error.stack}`;
+        }
+    }
+
+    async copyDebugResults() {
+        try {
+            if (this.lastDebugResults) {
+                await navigator.clipboard.writeText(this.lastDebugResults);
+                this.showMessage('Debug results copied to clipboard!', 'success');
+            } else {
+                this.showMessage('No results to copy. Run tests first.', 'error');
+            }
+        } catch (error) {
+            console.error('Error copying results:', error);
+            this.showMessage('Failed to copy results', 'error');
         }
     }
 

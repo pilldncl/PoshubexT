@@ -1,10 +1,19 @@
 // TrackHub Chrome Extension - Background Script
 class TrackHubBackground {
     constructor() {
+        this.contextMenuListenerAdded = false;
+        this.initialized = false;
         this.init();
     }
 
     init() {
+        if (this.initialized) {
+            console.log('⚠️ Background script already initialized, skipping...');
+            return;
+        }
+        
+        console.log('🚀 Initializing TrackHub background script...');
+        
         // Setup message listeners
         this.setupMessageListeners();
         
@@ -13,6 +22,9 @@ class TrackHubBackground {
         
         // Setup installation handler
         this.setupInstallationHandler();
+        
+        this.initialized = true;
+        console.log('✅ Background script initialization completed');
     }
 
     setupMessageListeners() {
@@ -47,6 +59,11 @@ class TrackHubBackground {
                     
                 case 'deleteTracking':
                     await this.handleDeleteTracking(request.data);
+                    sendResponse({ success: true });
+                    break;
+                    
+                case 'ensureContextMenu':
+                    this.setupContextMenu();
                     sendResponse({ success: true });
                     break;
                     
@@ -106,65 +123,85 @@ class TrackHubBackground {
 
             console.log('Tracking item added to storage:', trackingData);
             
-            // Prepare backend request data and send to popup
+            // Try to send to backend API first, then Supabase as backup
             try {
                 const authToken = await this.getAuthToken();
                 console.log('🔑 Background: Auth token retrieved:', authToken ? 'Present' : 'Missing');
+                console.log('📦 Background: Tracking data to send:', trackingData);
                 
-                // Try different token formats based on what backend expects
-                let authHeader = '';
                 if (authToken) {
-                    // Check if token already has Bearer prefix
-                    if (authToken.startsWith('Bearer ')) {
-                        authHeader = authToken;
-                    } else {
-                        // Try Bearer format first (most common)
-                        authHeader = `Bearer ${authToken}`;
+                    // Try backend API first
+                    console.log('🚀 Background: Attempting backend API call...');
+                    console.log('🌐 Background: Backend URL: http://localhost:3000/api/tracking/add');
+                    
+                    // Quick connectivity test first
+                    try {
+                        console.log('🔍 Background: Testing backend connectivity...');
+                        const healthResponse = await fetch('http://localhost:3000/api/health', {
+                            method: 'GET',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        console.log('🔗 Background: Backend health check:', healthResponse.status, healthResponse.statusText);
+                    } catch (healthError) {
+                        console.log('❌ Background: Backend health check failed:', healthError.message);
+                        console.log('💡 Background: Is your backend server running on http://localhost:3000?');
                     }
+                    
+                    try {
+                        const backendApiResult = await this.sendToBackendAPI(trackingData, authToken);
+                        console.log('✅ Background: Backend API completed successfully:', backendApiResult);
+                        await this.showNotification('Tracking Added', `Successfully added ${trackingData.brand.toUpperCase()} tracking to backend`);
+                    } catch (backendError) {
+                        console.log('❌ Background: Backend API failed:', backendError.message);
+                        console.log('🔍 Background: Full error details:', backendError);
+                        
+                        // Handle specific error types with user-friendly messages
+                        if (backendError.message.includes('TRACKING_EXISTS')) {
+                            await this.showNotification('Already Tracked', 'This tracking number is already in your account');
+                        } else if (backendError.message.includes('AUTH_FAILED')) {
+                            await this.showNotification('Login Required', 'Please log in again to sync with backend');
+                        } else if (backendError.message.includes('INVALID_DATA')) {
+                            await this.showNotification('Invalid Data', 'Please check your tracking number format');
+                        } else if (backendError.message.includes('SERVER_ERROR')) {
+                            await this.showNotification('Server Error', 'Backend server is having issues, but tracking saved locally');
+                        } else if (backendError.message.includes('Failed to fetch')) {
+                            await this.showNotification('Connection Failed', 'Cannot connect to backend server, but tracking saved locally');
+                        } else {
+                            await this.showNotification('Backend Error', 'Failed to sync with backend, but tracking saved locally');
+                        }
+                    }
+                } else {
+                    console.log('❌ Background: No auth token available for backend API');
                 }
+                    
+                    // Also send to Supabase for sync
+                    console.log('🚀 Background: Sending to popup for Supabase...');
+                    chrome.runtime.sendMessage({
+                        action: 'quickAddToSupabase',
+                        data: {
+                            trackingNumber: trackingData.trackingNumber,
+                            carrierId: trackingData.brand,
+                            description: trackingData.description || '',
+                            status: trackingData.status || 'active',
+                            metadata: {
+                                description: trackingData.description || '',
+                                addedVia: 'context_menu',
+                                source: 'Unknown'
+                            }
+                        }
+                    }, (response) => {
+                        if (chrome.runtime.lastError) {
+                            console.log('🔴 Background: Popup not open, storing for later:', chrome.runtime.lastError.message);
+                            // Store the tracking data for when popup opens
+                            this.storePendingTrackingData(trackingData);
+                        } else {
+                            console.log('🟢 Background: Quick add sent to popup successfully');
+                        }
+                    });
                 
-                const backendRequestData = {
-                    method: 'POST',
-                    url: 'http://localhost:3000/api/tracking/add',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': authHeader,
-                        'X-Extension-Version': '1.0.0'
-                    },
-                    body: {
-                        trackingNumber: trackingData.trackingNumber,
-                        brand: trackingData.brand,
-                        description: trackingData.description || '',
-                        dateAdded: trackingData.dateAdded,
-                        status: trackingData.status || 'pending'
-                    }
-                };
-                
-                console.log('🔵 Background: Request headers prepared:', backendRequestData.headers);
-                console.log('🔵 Background: Authorization header value:', backendRequestData.headers.Authorization);
-
-                // Try to send message to popup
-                chrome.runtime.sendMessage({
-                    action: 'submitBackendRequest',
-                    data: {
-                        trackingItem: trackingData,
-                        requestData: backendRequestData
-                    }
-                }, (response) => {
-                    if (chrome.runtime.lastError) {
-                        console.log('🔴 Background: Popup not open, message failed:', chrome.runtime.lastError.message);
-                        // Store the request for when popup opens
-                        this.storePendingBackendRequest(trackingData, backendRequestData);
-                    } else {
-                        console.log('🟢 Background: Message sent to popup successfully');
-                    }
-                });
-                
-                console.log('🟡 Background: Prepared backend request data for popup');
+                console.log('🟡 Background: Processed quick add tracking');
             } catch (error) {
-                console.log('🔴 Background: Error preparing backend request:', error);
-            }
-            
+                console.log('🔴 Background: Error processing quick add:', error);}
             // Notify popup to refresh if it's open
             try {
                 chrome.runtime.sendMessage({
@@ -197,8 +234,27 @@ class TrackHubBackground {
 
     async getAuthToken() {
         try {
+            // Check for Auth0 token first (new system)
+            const auth0Result = await chrome.storage.local.get(['auth0_access_token', 'auth0_token_expiry']);
+            if (auth0Result.auth0_access_token && auth0Result.auth0_token_expiry) {
+                // Check if token is expired
+                if (Date.now() < auth0Result.auth0_token_expiry) {
+                    console.log('🔑 Background: Using Auth0 token');
+                    return auth0Result.auth0_access_token;
+                } else {
+                    console.log('🔑 Background: Auth0 token expired');
+                }
+            }
+            
+            // Fallback to old system
             const result = await chrome.storage.local.get(['trackhub_access_token']);
-            return result.trackhub_access_token || null;
+            if (result.trackhub_access_token) {
+                console.log('🔑 Background: Using legacy token');
+                return result.trackhub_access_token;
+            }
+            
+            console.log('🔑 Background: No valid token found');
+            return null;
         } catch (error) {
             console.error('Error getting auth token:', error);
             return null;
@@ -218,6 +274,93 @@ class TrackHubBackground {
             console.log('🟡 Background: Stored pending backend request for later');
         } catch (error) {
             console.error('Error storing pending backend request:', error);
+        }
+    }
+
+    async storePendingTrackingData(trackingData) {
+        try {
+            const result = await chrome.storage.local.get(['pendingTrackingData']);
+            const pendingData = result.pendingTrackingData || [];
+            pendingData.push({
+                ...trackingData,
+                timestamp: Date.now()
+            });
+            await chrome.storage.local.set({ pendingTrackingData: pendingData });
+            console.log('🟡 Background: Stored pending tracking data for later');
+        } catch (error) {
+            console.error('Error storing pending tracking data:', error);
+        }
+    }
+
+
+    async sendToBackendAPI(trackingData, authToken) {
+        try {
+            console.log('🌐 Background: Sending to backend API...');
+            console.log('🔑 Background: Auth token provided:', authToken ? `Present (length: ${authToken.length})` : 'NULL');
+            
+            if (!authToken) {
+                throw new Error('No auth token provided to background script');
+            }
+            
+            // Prepare backend request data
+            const backendRequestData = {
+                method: 'POST',
+                url: 'http://localhost:3000/api/tracking/add',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                    'X-Extension-Version': '1.0.0'
+                },
+                body: {
+                    trackingNumber: trackingData.trackingNumber,
+                    ...(trackingData.brand && { brand: trackingData.brand }),
+                    ...(trackingData.description && { description: trackingData.description }),
+                    ...(trackingData.dateAdded && { dateAdded: trackingData.dateAdded }),
+                    ...(trackingData.status && { status: trackingData.status })
+                }
+            };
+            
+            console.log('🔵 Background: Backend API request prepared:', {
+                url: backendRequestData.url,
+                method: backendRequestData.method,
+                hasAuth: !!backendRequestData.headers.Authorization,
+                authHeader: backendRequestData.headers.Authorization.substring(0, 20) + '...'
+            });
+
+            // Send to backend API
+            const response = await fetch(backendRequestData.url, {
+                method: backendRequestData.method,
+                headers: backendRequestData.headers,
+                body: JSON.stringify(backendRequestData.body)
+            });
+
+            console.log('📡 Background: Backend API response status:', response.status, response.statusText);
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ Background: Backend API success:', result);
+                return result;
+            } else {
+                const errorText = await response.text();
+                console.log('❌ Background: Backend API error:', response.status, errorText);
+                
+                // Handle specific error codes with better messages
+                if (response.status === 409) {
+                    throw new Error('TRACKING_EXISTS: This tracking number already exists in your account');
+                } else if (response.status === 401) {
+                    throw new Error('AUTH_FAILED: Please log in again to continue');
+                } else if (response.status === 400) {
+                    throw new Error('INVALID_DATA: Please check your tracking number and try again');
+                } else if (response.status === 500) {
+                    throw new Error('SERVER_ERROR: Backend server is experiencing issues');
+                } else {
+                    throw new Error(`Backend API failed: ${response.status} ${response.statusText}`);
+                }
+            }
+            
+        } catch (error) {
+            console.error('❌ Background: Error sending to backend API:', error);
+            throw error;
         }
     }
 
@@ -249,28 +392,71 @@ class TrackHubBackground {
     }
 
     setupContextMenu() {
-        // Create context menu for quick add feature
-        chrome.contextMenus.create({
-            id: 'quickAddTracking',
-            title: 'Add to TrackHub',
-            contexts: ['selection']
-        });
+        console.log('🔧 Setting up context menu...');
+        
+        try {
+            // Remove existing context menu first to avoid duplicates
+            chrome.contextMenus.removeAll(() => {
+                console.log('🧹 Context menus removed');
+                
+                // Wait a moment before creating new menu
+                setTimeout(() => {
+                    // Create context menu for quick add feature
+                    chrome.contextMenus.create({
+                        id: 'quickAddTracking',
+                        title: 'Add to TrackHub',
+                        contexts: ['selection']
+                    }, () => {
+                        if (chrome.runtime.lastError) {
+                            console.error('❌ Context menu creation failed:', chrome.runtime.lastError);
+                        } else {
+                            console.log('✅ Context menu created successfully: quickAddTracking');
+                        }
+                    });
+                }, 100);
+            });
 
-        console.log('Context menu created: quickAddTracking');
-
-        // Handle context menu clicks
-        chrome.contextMenus.onClicked.addListener((info, tab) => {
-            console.log('Context menu clicked:', info);
-            if (info.menuItemId === 'quickAddTracking' && info.selectionText) {
-                console.log('Processing quick add for text:', info.selectionText);
-                this.handleContextMenuClick(info.selectionText, tab);
+            // Handle context menu clicks (only add once)
+            if (!this.contextMenuListenerAdded) {
+                chrome.contextMenus.onClicked.addListener((info, tab) => {
+                    console.log('🖱️ Context menu clicked:', info);
+                    if (info.menuItemId === 'quickAddTracking' && info.selectionText) {
+                        console.log('📝 Processing quick add for text:', info.selectionText);
+                        this.handleContextMenuClick(info.selectionText, tab);
+                    }
+                });
+                this.contextMenuListenerAdded = true;
+                console.log('✅ Context menu click listener added');
             }
-        });
+            
+            console.log('✅ Context menu setup completed');
+        } catch (error) {
+            console.error('❌ Context menu setup failed:', error);
+        }
+    }
+
+    // Clean and filter tracking number input
+    cleanTrackingNumber(input) {
+        if (!input) return '';
+        
+        // Remove common delimiters and unwanted characters
+        let cleaned = input
+            .trim()
+            .replace(/[\s\-_.,;:|\\/]+/g, '') // Remove spaces, hyphens, underscores, dots, commas, semicolons, colons, pipes, backslashes, forward slashes
+            .replace(/[^\w]/g, '') // Remove any remaining non-alphanumeric characters
+            .toUpperCase(); // Convert to uppercase for consistency
+        
+        console.log('🧹 Background: Input cleaned:', { original: input, cleaned: cleaned });
+        return cleaned;
     }
 
     async handleContextMenuClick(selectedText, tab) {
         try {
             console.log('Context menu clicked with text:', selectedText);
+            
+            // Clean the selected text first
+            const cleanedText = this.cleanTrackingNumber(selectedText);
+            console.log('🧹 Background: Cleaned text:', cleanedText);
             
             // Check if user is logged in (OAuth or local)
             const isOAuthAuthenticated = await this.checkOAuthAuth();
@@ -282,11 +468,15 @@ class TrackHubBackground {
             }
 
             // Detect if selected text looks like a tracking number
-            if (this.isTrackingNumber(selectedText)) {
+            if (this.isTrackingNumber(cleanedText)) {
+                // Simple brand detection (no API prediction)
+                const detectedBrand = this.detectBrand(cleanedText);
+                console.log('Detected brand:', detectedBrand);
+
                 const trackingData = {
                     id: Date.now().toString(),
-                    trackingNumber: selectedText.trim(),
-                    brand: this.detectBrand(selectedText),
+                    trackingNumber: cleanedText,
+                    brand: detectedBrand,
                     description: `Quick add from ${tab.title}`,
                     dateAdded: new Date().toISOString(),
                     status: 'pending'
@@ -296,7 +486,7 @@ class TrackHubBackground {
                 await this.showNotification('Tracking Added', `Added ${trackingData.brand.toUpperCase()} tracking`);
             } else {
                 // Ask user to confirm if they want to add this text
-                await this.showConfirmationDialog(selectedText, tab);
+                await this.showConfirmationDialog(cleanedText, tab);
             }
         } catch (error) {
             console.error('Error handling context menu click:', error);
@@ -306,13 +496,26 @@ class TrackHubBackground {
 
     async checkOAuthAuth() {
         try {
-            const result = await chrome.storage.local.get(['trackhub_access_token', 'trackhub_token_expiry']);
-            if (!result.trackhub_access_token) return false;
+            // Check Auth0 token first (new system)
+            const auth0Result = await chrome.storage.local.get(['auth0_access_token', 'auth0_token_expiry']);
+            if (auth0Result.auth0_access_token && auth0Result.auth0_token_expiry) {
+                const now = Date.now();
+                const expiry = auth0Result.auth0_token_expiry;
+                console.log('🔍 Background: Auth0 auth check:', now < expiry ? 'VALID' : 'EXPIRED');
+                return now < expiry;
+            }
             
-            const now = Date.now();
-            const expiry = result.trackhub_token_expiry;
-            return now < expiry;
+            // Fallback to old system
+            const result = await chrome.storage.local.get(['trackhub_access_token', 'trackhub_token_expiry']);
+            if (result.trackhub_access_token) {
+                const now = Date.now();
+                const expiry = result.trackhub_token_expiry;
+                return now < expiry;
+            }
+            
+            return false;
         } catch (error) {
+            console.error('Error checking OAuth auth:', error);
             return false;
         }
     }
@@ -390,7 +593,7 @@ class TrackHubBackground {
             }
             
             // Get auth token
-            const token = await this.getAuthToken();
+            const token = await this.getWebappAuthToken();
             if (!token) {
                 console.log('No auth token available, skipping webapp sync');
                 return;
@@ -429,12 +632,12 @@ class TrackHubBackground {
         }
     }
 
-    async getAuthToken() {
+    async getWebappAuthToken() {
         try {
             const result = await chrome.storage.local.get(['authToken']);
             return result.authToken || null;
         } catch (error) {
-            console.error('Error getting auth token:', error);
+            console.error('Error getting webapp auth token:', error);
             return null;
         }
     }
